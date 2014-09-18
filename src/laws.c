@@ -691,29 +691,47 @@ static int count_race(const region * r, const race * rc)
 
 extern struct attrib_type at_germs;
 
-static void
-growing_trees_e3(region * r, const int current_season,
-const int last_weeks_season)
+
+static void growing_trees_e3(region * r, const int current_season, const int last_weeks_season)
 {
-    static const int transform[4][3] = {
+    int divisor[4];
+    /* This value is the statistic number of seeds needed to generate one new tree every week, e.g 10 means out of 10 trees one seed is created, 15 means 1 out of 15 */
+    divisor[1] = get_param_int(global.parameters, "rules.economy.seed_devisor", 12);
+    /* Number of sapplings needed for on tree */
+    divisor[2] = get_param_int(global.parameters, "rules.economy.sapling_devisor", 12);
+    /* Number of trees needed for on seed */
+    divisor[3] = get_param_int(global.parameters, "rules.economy.tree_devisor", 12);
+    static int transform[4][3] = {
             { -1, -1, 0 },
-            { TREE_SEED, TREE_SAPLING, 2 },
+            { TREE_SEED, TREE_SAPLING, 1 },
             { TREE_SAPLING, TREE_TREE, 2 },
-            { TREE_TREE, TREE_SEED, 2 }
+            { TREE_TREE, TREE_SEED, 3 }
     };
 
-    if (r->land && current_season != last_weeks_season
-        && transform[current_season][2]) {
+    if (r->land && transform[current_season][2]) {
         int src_type = transform[current_season][0];
         int dst_type = transform[current_season][1];
         int src = rtrees(r, src_type);
         int dst = rtrees(r, dst_type);
-        int grow = src / transform[current_season][2];
+        int grow = src / divisor [transform[current_season][2]];
+        if (chance(((double)src / divisor[transform[current_season][2]]) - grow))
+            {
+                ++grow;
+            }
         if (grow > 0) {
+            if (src_type == TREE_SEED && rtrees(r, TREE_TREE) > r->terrain->size) {
+                grow = 0;
+            }
+            /* only seeds that grew into a sappling and sapplings that grew into a tree are removed */
             if (src_type != TREE_TREE) {
                 rsettrees(r, src_type, src - grow);
             }
-            rsettrees(r, dst_type, dst + grow);
+            /* new seeds only if there is room in the region*/
+            if (!((src_type == TREE_TREE) && ((rtrees(r, TREE_TREE) + rtrees(r, TREE_SAPLING)) > r->terrain->size)))
+            {
+                rsettrees(r, dst_type, dst + grow);
+            }
+            
 
             if (dst_type == TREE_SEED && r->terrain->size) {
                 region *rn[MAXDIRECTIONS];
@@ -737,7 +755,7 @@ const int last_weeks_season)
                         ch = fg - g;
                         if (chance(ch))
                             ++g;
-                        if (g > 0) {
+                        if (g > 0 && (rtrees(r, TREE_TREE) + rtrees(r, TREE_SAPLING)) < rx->terrain->size) {
                             rsettrees(rx, dst_type, seeds + g);
                         }
                     }
@@ -746,6 +764,7 @@ const int last_weeks_season)
         }
     }
 }
+
 
 static void
 growing_trees(region * r, const int current_season, const int last_weeks_season)
