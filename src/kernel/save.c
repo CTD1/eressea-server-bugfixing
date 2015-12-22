@@ -1610,6 +1610,10 @@ int readgame(const char *filename, bool backup)
 
             READ_INT(&store, &sh->size);
             READ_INT(&store, &sh->damage);
+            if (gdata.version >= FLEETS) {      /* Read fleet no */
+                READ_INT(&store, &sh->fleet_no);
+            }
+
             if (gdata.version >= FOSS_VERSION) {
                 READ_INT(&store, &sh->flags);
             }
@@ -1623,6 +1627,21 @@ int readgame(const char *filename, bool backup)
             }
             a_read(&store, &sh->attribs, sh);
         }
+
+        if (gdata.version >= FLEETS) {      /* Fleet no to pointer */
+            /* seperate to make sure all ships in the region are already readed from the datafile */
+            shp = &r->ships;
+
+            while (*shp) {
+                ship *sh = *shp;
+                if (sh->fleet_no) {
+                    sh->fleet = findship(sh->fleet_no);
+                }
+                if (*shp == sh)
+                    shp = &sh->next;
+            }
+        }
+
 
         *shp = 0;
 
@@ -1865,6 +1884,7 @@ int writegame(const char *filename)
             WRITE_TOK(&store, sh->type->_name);
             WRITE_INT(&store, sh->size);
             WRITE_INT(&store, sh->damage);
+            write_ship_reference(sh->fleet, &store);
             WRITE_INT(&store, sh->flags & SFL_SAVEMASK);
             assert((sh->type->flags & SFL_NOCOAST) == 0 || sh->coast == NODIRECTION);
             WRITE_INT(&store, sh->coast);

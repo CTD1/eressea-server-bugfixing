@@ -842,7 +842,7 @@ static int config_get_stype(lua_State * L)
     const char *name = tolua_tostring(L, 1, 0);
 
     if (name) {
-        const struct ship_type *stype = st_find(name);
+        struct ship_type *stype = st_find(name); /* CTD const */
         if (stype) {
             lua_newtable(L);
             lua_pushstring(L, "range");

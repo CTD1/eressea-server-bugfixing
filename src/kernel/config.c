@@ -209,7 +209,11 @@ const char *parameters[MAXPARAMS] = {
     "GRUPPE",
     "PARTEITARNUNG",
     "BAEUME",
-    "ALLIANZ"
+    "ALLIANZ",
+    "FLEET",   /* for Enter and Follow Commands*/
+    "CREATE",  /* for FLEET Command */
+    "JOIN",   /* for FLEET Command */
+    "LEAVE"   /* for FLEET Command */
 };
 
 const char *report_options[MAX_MSG] = {

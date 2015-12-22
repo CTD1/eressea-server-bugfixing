@@ -123,7 +123,7 @@ building * test_create_building(region * r, const building_type * btype)
     return b;
 }
 
-ship * test_create_ship(region * r, const ship_type * stype)
+ship * test_create_ship(region * r, ship_type * stype) /* CTD const (region * r, const ship_type * stype) */
 {
     ship * s = new_ship(stype ? stype : test_create_shiptype("boat"), r, default_locale);
     s->size = s->type->construction ? s->type->construction->maxsize : 1;

@@ -1471,7 +1471,7 @@ int make_cmd(unit * u, struct order *ord)
     char token[128];
     region *r = u->region;
     const building_type *btype = 0;
-    const ship_type *stype = 0;
+    ship_type *stype = 0; /* CTD const */
     const item_type *itype = 0;
     param_t p = NOPARAM;
     int m = INT_MAX;

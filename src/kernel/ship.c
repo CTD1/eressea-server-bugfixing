@@ -18,6 +18,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #include <platform.h>
 #include <kernel/config.h>
+#include <kernel/order.h>
 #include "ship.h"
 
 /* kernel includes */
@@ -26,6 +27,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "faction.h"
 #include "unit.h"
 #include "item.h"
+#include "keyword.h"
 #include "race.h"
 #include "region.h"
 #include "skill.h"
@@ -38,6 +40,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <util/language.h>
 #include <util/lists.h>
 #include <util/umlaut.h>
+#include <util/parser.h>
 #include <quicklist.h>
 #include <util/xml.h>
 
@@ -55,7 +58,7 @@ quicklist *shiptypes = NULL;
 
 static local_names *snames;
 
-const ship_type *findshiptype(const char *name, const struct locale *lang)
+ship_type *findshiptype(const char *name, const struct locale *lang) /* CTD const */
 {
     local_names *sn = snames;
     variant var;
@@ -84,7 +87,7 @@ const ship_type *findshiptype(const char *name, const struct locale *lang)
     }
     if (findtoken(sn->names, name, &var) == E_TOK_NOMATCH)
         return NULL;
-    return (const ship_type *)var.v;
+    return (ship_type *)var.v;  /* CTD const */
 }
 
 static ship_type *st_find_i(const char *name)
@@ -101,7 +104,7 @@ static ship_type *st_find_i(const char *name)
     return NULL;
 }
 
-const ship_type *st_find(const char *name) {
+ship_type *st_find(const char *name) { /* CTD const */
     return st_find_i(name);
 }
 
@@ -179,7 +182,7 @@ void damage_ship(ship * sh, double percent)
 /* Alte Schiffstypen: */
 static ship *deleted_ships;
 
-ship *new_ship(const ship_type * stype, region * r, const struct locale *lang)
+ship *new_ship(ship_type * stype, region * r, const struct locale *lang) /* CTD const (const ship_type * stype, region * r, const struct locale *lang)*/
 {
     static char buffer[32];
     ship *sh = (ship *)calloc(1, sizeof(ship));
@@ -444,9 +447,12 @@ void ship_update_owner(ship * sh) {
     sh->_owner = ship_owner_ex(sh, owner ? owner->faction : 0);
 }
 
-unit *ship_owner(const ship * sh)
+unit *ship_owner(ship * sh) /* CTD const (const ship * sh)*/
 {
     unit *owner = sh->_owner;
+    if (sh->fleet) {
+        owner = ship_owner(sh->fleet);
+    }
     if (!owner || (owner->ship != sh || owner->number <= 0)) {
         unit * heir = ship_owner_ex(sh, owner ? owner->faction : 0);
         return (heir && heir->number > 0) ? heir : 0;
@@ -472,4 +478,197 @@ const char *ship_getname(const ship * self)
 
 int ship_damage_percent(const ship *ship) {
     return (ship->damage * 100 + DAMAGE_SCALE - 1) / (ship->size * DAMAGE_SCALE);
+}
+
+
+void fleet(region * r)
+{
+    unit **uptr;
+    ship *sh;
+    ship *fl;
+    unit *u2;
+
+    for (uptr = &r->units; *uptr;) {
+        unit *u = *uptr;
+        order **ordp = &u->orders;
+
+        while (*ordp) {
+            order *ord = *ordp;
+            if (getkeyword(ord) == K_FLEET) {
+                char token[128];
+                param_t p;
+                int id;
+                const char * s;
+
+                init_order(ord);
+                s = gettoken(token, sizeof(token));
+                p = findparam_ex(s, u->faction->locale);
+                id = getid();
+
+                // Minimum Segeln 6
+                if (effskill(u, SK_SAILING, 0) < 6 || !(fval(u_race(u), RCF_CANSAIL))) {
+                    // TODO Fecmistake(u, u->thisorder, 100, MSG_PRODUCE);
+                    return;
+                }
+                /* Die Schiffsnummer bzw der Schiffstyp wird eingelesen */
+                sh = getship(r);
+
+                switch (p) {
+                case P_CREATE:
+                    if (!sh)
+                        sh = u->ship;
+                    if (!sh || sh->type == st_find("fleet")) {
+                        // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
+                        // Kein Schiff oder eine Flotte angegeben, nur einzelne Schiffe können in eine Flotte.
+                        return;
+                    }
+                    // Wass wenn garkeiner auf dem Schiff ist??????
+                    // Muss dringend gebrüft werden!! -> OK
+                    if (ship_owner(sh) && !ucontact(u, ship_owner(sh))) {
+                        /* Prueft, ob u den Kontaktiere-Befehl zum Schiffsbesitzer gesetzt ist */
+                        // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
+                        return;
+                    }
+
+                    // aber nur wenn nicht schon Chef einer Flotte!
+                    if (u->ship && u->ship->type == st_find("fleet")) {
+                        if (ship_owner(u->ship) == u) {
+                            // Error, Einheit ist schon Flottencheff cmistake(u, u->thisorder, 20, MSG_PRODUCE);
+                            return;
+                        }
+                    }
+
+                    if (leave(u, true)) {
+                        if (fval(u_race(u), RCF_CANSAIL)) {
+
+                            // Flotte anlegen, Einheit wird Besitzer, Schiff hinzufügen, alle Einheiten aus dem Schiff der Flotte hinzufügen!
+                            ship_type *newtype = st_find("fleet");
+                            fl = new_ship(newtype, r, u->faction->locale);
+                            u_set_ship(u, fl);
+                            sh->_owner = u; // aber u ist auf der flotte, nicht auf dem Schiff! Sicherstellen das da nix schief geht! -> ship_owner
+                            fl->size = 1;
+                            sh->fleet = fl;
+                            // u ans ende der Region sortieren??
+
+                            // add to fleet
+
+                            /* all units leave the ship and go to the fleet */
+                            for (u2 = r->units; u2; u2 = u2->next) {
+                                if (u2->ship == sh) {
+                                    leave_ship(u2);
+                                    u_set_ship(u2, u->ship);
+                                    unit *ulast;
+                                    unit *ub2;
+                                    ulast = u2;
+                                    for (ub2 = u2; ub2; ub2 = ub2->next) {
+                                        if (ub2->ship == u2->ship) {
+                                            ulast = ub2;
+                                        }
+                                    }
+                                    if (ulast != u2) {
+                                        /* put u2 behind ulast so it's the last unit in the ship */
+                                        *uptr = u2->next;
+                                        u2->next = ulast->next;
+                                        ulast->next = u2;
+                                    }
+                                    if (*uptr == u2)
+                                        uptr = &u2->next;
+                                }
+                            }
+
+                case P_JOIN:
+                    fl = u->ship;
+                    if (!fl || fl->type != st_find("fleet") || ship_owner(fl) != u) {
+                        // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
+                        // error only fleet kaptn can add ships!
+                        return;
+                    }
+
+                    if (!sh || sh->type == st_find("fleet")) {
+                        // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
+                        // Kein Schiff oder eine Flotte angegeben, nur einzelne Schiffe können in eine Flotte.
+                        return;
+                    }
+
+                    if (fl == sh->fleet) {
+                        // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
+                        // error ship is already in the fleet!
+                        return;
+                    }
+
+                    sh->_owner = u; // aber u ist auf der flotte, nicht auf dem Schiff! Sicherstellen das da nix schief geht! -> ship_owner
+                    fl->size++;
+                    sh->fleet = fl;
+
+                    // add to fleet
+
+                    /* all units leave the ship and go to the fleet */
+                    for (u2 = r->units; u2; u2 = u2->next) {
+                        if (u2->ship == sh) {
+                            leave_ship(u2);
+                            u_set_ship(u2, u->ship);
+                            unit *ulast;
+                            unit *ub2;
+                            ulast = u2;
+                            for (ub2 = u2; ub2; ub2 = ub2->next) {
+                                if (ub2->ship == u2->ship) {
+                                    ulast = ub2;
+                                }
+                            }
+                            if (ulast != u2) {
+                                /* put u2 behind ulast so it's the last unit in the ship */
+                                *uptr = u2->next;
+                                u2->next = ulast->next;
+                                ulast->next = u2;
+                            }
+                            if (*uptr == u2)
+                                uptr = &u2->next;
+
+                        }
+                    }
+
+                case P_LEAVE:
+                    fl = u->ship;
+                    if (!fl || fl->type != st_find("fleet") || ship_owner(fl) != u) {
+                        // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
+                        // error only fleet kapt'n can add ships!
+                        return;
+                    }
+
+                    if (!sh || sh->type == st_find("fleet")) {
+                        // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
+                        // Kein Schiff oder eine Flotte angegeben, nur einzelne Schiffe können die Flotte verlassen.
+                        return;
+                    }
+
+                    if (fl != sh->fleet) {
+                        // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
+                        // error ship is not part of the fleet!
+                        return;
+                    }
+
+                    fl->size--;
+                    sh->fleet = NULL;
+                    sh->_owner = NULL;
+
+                    if (fl->size < 1) {
+                        // delet fleet!
+                        // make sure there is realy no ship left in the fleet!
+                        remove_ship(&fl->region->ships, fl);
+                    }
+                    break;
+                        }
+                    }
+
+                    sh->fleet = u->ship;
+                    sh->_owner = ship_owner(u->ship);
+
+                }
+            }
+            if (*ordp == ord)
+                ordp = &ord->next;
+        }
+        if (*uptr == u)
+            uptr = &u->next;
+    }
 }

@@ -35,7 +35,7 @@ static void test_ship_set_owner(CuTest * tc)
     struct ship *sh;
     struct unit *u1, *u2;
     struct faction *f;
-    const struct ship_type *stype;
+    struct ship_type *stype; /* CTD const */
     const struct race *human;
 
     test_cleanup();
@@ -64,7 +64,7 @@ static void test_shipowner_goes_to_next_when_empty(CuTest * tc)
     struct ship *sh;
     struct unit *u, *u2;
     struct faction *f;
-    const struct ship_type *stype;
+    struct ship_type *stype; /* CTD const */
     const struct race *human;
 
     test_cleanup();
@@ -98,7 +98,7 @@ static void test_shipowner_goes_to_other_when_empty(CuTest * tc)
     struct ship *sh;
     struct unit *u, *u2;
     struct faction *f;
-    const struct ship_type *stype;
+    struct ship_type *stype; /* CTD const */
     const struct race *human;
 
     test_cleanup();
@@ -132,7 +132,7 @@ static void test_shipowner_goes_to_same_faction_when_empty(CuTest * tc)
     struct ship *sh;
     struct unit *u, *u2, *u3;
     struct faction *f1, *f2;
-    const struct ship_type *stype;
+    struct ship_type *stype; /* CTD const */
     const struct race *human;
 
     test_cleanup();
@@ -171,7 +171,7 @@ static void test_shipowner_goes_to_next_after_leave(CuTest * tc)
     struct ship *sh;
     struct unit *u, *u2;
     struct faction *f;
-    const struct ship_type *stype;
+    struct ship_type *stype; /* CTD const */
     const struct race *human;
 
     test_cleanup();
@@ -205,7 +205,7 @@ static void test_shipowner_goes_to_other_after_leave(CuTest * tc)
     struct ship *sh;
     struct unit *u, *u2;
     struct faction *f;
-    const struct ship_type *stype;
+    struct ship_type *stype; /* CTD const */
     const struct race *human;
 
     test_cleanup();
@@ -239,7 +239,7 @@ static void test_shipowner_goes_to_same_faction_after_leave(CuTest * tc)
     struct ship *sh;
     struct unit *u, *u2, *u3;
     struct faction *f1, *f2;
-    const struct ship_type *stype;
+    struct ship_type *stype; /* CTD const */
     const struct race *human;
 
     test_cleanup();
@@ -280,7 +280,7 @@ static void test_shipowner_resets_when_empty(CuTest * tc)
     struct ship *sh;
     struct unit *u;
     struct faction *f;
-    const struct ship_type *stype;
+    struct ship_type *stype; /* CTD const */
     const struct race *human;
 
     test_cleanup();
@@ -314,7 +314,7 @@ void test_shipowner_goes_to_empty_unit_after_leave(CuTest * tc)
     struct ship *sh;
     struct unit *u1, *u2, *u3;
     struct faction *f1;
-    const struct ship_type *stype;
+    struct ship_type *stype; /* CTD const */
     const struct race *human;
 
     test_cleanup();

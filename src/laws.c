@@ -1124,6 +1124,7 @@ static void do_contact(region * r)
 void do_enter(struct region *r, bool is_final_attempt)
 {
     unit **uptr;
+    ship *sh;
 
     for (uptr = &r->units; *uptr;) {
         unit *u = *uptr;
@@ -1159,8 +1160,12 @@ void do_enter(struct region *r, bool is_final_attempt)
                     break;
 
                 case P_SHIP:
+                case P_FLEET:
                     if (u->ship && u->ship->no == id)
                         break;
+                    sh = findship(id);
+                    if (sh != NULL && sh->fleet)
+                        id = sh->fleet->no;
                     if (enter_ship(u, ord, id, is_final_attempt)) {
                         unit *ub;
                         ulast = u;
@@ -1536,6 +1541,7 @@ int display_cmd(unit * u, struct order *ord)
         break;
 
     case P_SHIP:
+    case P_FLEET:
         if (!u->ship) {
             cmistake(u, ord, 144, MSG_PRODUCE);
             break;
@@ -1761,6 +1767,7 @@ int name_cmd(struct unit *u, struct order *ord)
         break;
 
     case P_SHIP:
+    case P_FLEET:
         if (foreign) {
             ship *sh = getship(r);
             unit *uo;
@@ -2066,6 +2073,7 @@ int mail_cmd(unit * u, struct order *ord)
         }
 
         case P_SHIP:
+        case P_FLEET:
         {
             ship *sh = getship(r);
 
@@ -2952,6 +2960,7 @@ int renumber_cmd(unit * u, order * ord)
         break;
 
     case P_SHIP:
+    case P_FLEET:
         if (!u->ship) {
             cmistake(u, ord, 144, MSG_EVENT);
             break;
@@ -4326,6 +4335,9 @@ void init_processor(void)
     p += 10;
     add_proc_region(p, do_contact, "Kontaktieren");
     add_proc_order(p, K_MAIL, mail_cmd, 0, "Botschaften");
+
+    p += 10;
+    add_proc_region(p, fleet, "Fleets");
 
     p += 10;                      /* all claims must be done before we can USE */
     add_proc_region(p, enter_1, "Betreten (1. Versuch)");     /* for GIVE CONTROL */

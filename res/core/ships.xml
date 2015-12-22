@@ -78,6 +78,20 @@
     <coast terrain="iceberg"/>
     <construction skill="shipcraft" minskill="100" maxsize="50" reqsize="1"/>
   </ship>
+  
+  <ship name="fleet" range="1" storm="1.00" damage="1.00" cargo="1" cptskill="6" minskill="1" sumskill="6" opensea="yes">
+    <coast terrain="ocean"/>
+    <coast terrain="plain"/>
+    <coast terrain="swamp"/>
+    <coast terrain="desert"/>
+    <coast terrain="highland"/>
+    <coast terrain="mountain"/>
+    <coast terrain="glacier"/>
+    <coast terrain="volcano"/>
+    <coast terrain="activevolcano"/>
+    <construction skill="sailing" minskill="1" maxsize="1" reqsize="1">
+    </construction> 
+  </ship>
 
 </ships>
 

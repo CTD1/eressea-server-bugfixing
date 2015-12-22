@@ -36,7 +36,7 @@ static void test_reorder_units(CuTest * tc)
     unit *u0, *u1, *u2, *u3, *u4;
     struct faction * f;
     const building_type *btype;
-    const ship_type *stype;
+    ship_type *stype; /* CTD const */
 
     test_cleanup();
     test_create_world();

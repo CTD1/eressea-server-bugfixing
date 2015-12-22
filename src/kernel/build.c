@@ -889,8 +889,7 @@ static void build_ship(unit * u, ship * sh, int want)
 }
 
 void
-create_ship(unit * u, const struct ship_type *newtype, int want,
-order * ord)
+create_ship(unit * u, struct ship_type *newtype, int want, order * ord) /* CTD const */
 {
     ship *sh;
     int msize;
@@ -904,6 +903,11 @@ order * ord)
     }
     if (besieged(u)) {
         cmistake(u, ord, 60, MSG_PRODUCE);
+        return;
+    }
+
+    if (newtype == st_find("fleet")) {
+        /* Error massage, please use fleet create*/
         return;
     }
 

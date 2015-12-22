@@ -127,7 +127,7 @@ static int tolua_ship_create(lua_State * L)
     region *r = (region *)tolua_tousertype(L, 1, 0);
     const char *sname = tolua_tostring(L, 2, 0);
     if (sname) {
-        const ship_type *stype = st_find(sname);
+        ship_type *stype = st_find(sname);  /* CTD const */
         if (stype) {
             ship *sh = new_ship(stype, r, default_locale);
             sh->size = stype->construction ? stype->construction->maxsize : 1;

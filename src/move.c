@@ -1747,6 +1747,160 @@ static bool ship_ready(const region * r, unit * u, order * ord)
     return true;
 }
 
+
+/*
+void init_fleets(void)
+{
+    region *r;
+    for (r = regions; r; r = r->next) {
+        ship **shp = &r->ships;
+        while (*shp) {
+            ship *sh = *shp;
+            if (sh->type == st_find("fleet"))
+                init_fleet(sh);
+        }
+    }
+}
+*/
+
+void fleetdamage_to_ships(ship *fl)
+{
+    assert(fl->type == st_find("fleet"));
+    if (fl->damage) {
+        ship **shp = &fl->region->ships;
+
+        while (*shp) {
+            ship *sh = *shp;
+            if (sh->fleet && sh->fleet == fl)
+            {
+                damage_ship(sh, fl->damage);
+                if (sh->damage >= sh->size * DAMAGE_SCALE) {
+                    remove_ship(shp, sh);
+                    fl->size = fl->size - 1;
+                    fl->type->construction->maxsize = fl->size;
+                }
+            }
+            if (*shp == sh)
+                shp = &sh->next;
+        }
+        if (fl->size <= 0)
+        {
+            remove_ship(shp, fl);
+        }
+    }
+}
+
+int ship_allowed_terrain(const terrain_type *terrain, ship *sh)
+{
+    int c;
+    if (sh->type->coasts) {
+        for (c = 0; sh->type->coasts[c] != NULL; ++c) {
+            if (sh->type->coasts[c] == terrain) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+void init_fleet(ship *fl)
+{
+    assert(fl->type == st_find("fleet"));
+    int ships_in_fleet = 0; // add
+    int sumskill = 0; // add
+    int range = INT_MAX; // min
+    int cabins = 0; // max
+    int cargo = 0; // max
+    int cptskill = 6;  // Minimum skill for fleet captain, max
+    int fishing = 0; // Fishing Silver, add
+    int at_bonus = INT_MAX;  // min
+    int df_bonus = INT_MAX; // min
+    float tac_bonus = 10000.0; // min
+    int minskill = 0; // max
+    int range_max = INT_MAX; // min
+    double storm = 0.0; // max
+    int flying = 1;
+    int nocoast = 1;
+    int opensea = 1;
+    terrain_t c;
+    int k = 0;
+    int cost[20] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+
+    ship **shp = &fl->region->ships;
+
+    while (*shp) {
+        ship *sh = *shp;
+        if (sh->fleet && sh->fleet == fl)
+        {
+            ships_in_fleet++;
+            sumskill = sumskill + sh->type->sumskill;
+            cptskill = _max(cptskill, sh->type->cptskill);
+            int k = shipspeed(sh, ship_owner(fl));
+            range = _min(range, k);
+            if (sh->type->cabins)
+                cabins = cabins + sh->type->cabins;
+            cargo = cargo + sh->type->cargo;
+            if (sh->type->fishing > 0)
+                fishing = fishing + sh->type->fishing;
+            at_bonus = _min(at_bonus, sh->type->at_bonus);
+            df_bonus = _min(df_bonus, sh->type->df_bonus);
+            tac_bonus = _min(tac_bonus, sh->type->tac_bonus);
+            minskill = _max(minskill, sh->type->minskill);
+            range_max = _min(range_max, sh->type->range_max);
+            storm = _max(storm, sh->type->storm);
+            if (!sh->type->flags & SFL_NOCOAST)
+                nocoast = 0;
+            if (!flying_ship(sh))
+                flying = 0;
+            if (!sh->type->flags & SFL_OPENSEA)
+                opensea = 0;
+            for (c = 0; newterrain(c) != NULL; ++c) {
+                assert(c < 21); /* 14 terraintypes at the moment, if more then 20 increase the array! */
+                if (cost[c]) {
+                    cost[c] = ship_allowed_terrain(newterrain(c), sh);
+                }
+            }
+
+        }
+        if (*shp == sh)
+            shp = &sh->next;
+
+    }
+    fl->size = ships_in_fleet;
+    fl->type->construction->maxsize = ships_in_fleet;
+    fl->type->construction->improvement = NULL; /* Otherwise it looks like the (fleet)ship is not finished*/
+    fl->type->cptskill = cptskill;
+    fl->type->sumskill = sumskill;
+    fl->type->range = range;
+    if (cabins > 0)
+        fl->type->cabins = cabins;
+    fl->type->cargo = cargo;
+    if (fishing > 0) {
+        fl->type->fishing = fishing;
+        fl->flags |= SF_FISHING;
+    }
+    fl->type->at_bonus = at_bonus;
+    fl->type->df_bonus = df_bonus;
+    fl->type->tac_bonus = tac_bonus;
+    fl->type->minskill = minskill;
+    fl->type->range_max = range_max;
+    fl->type->storm = storm;
+    if (nocoast)
+        fl->flags |= SFL_NOCOAST;
+    if (flying)
+        fl->flags |= SFL_FLY;
+    if (opensea)
+        fl->flags |= SFL_OPENSEA;
+    for (c = 0; newterrain(c) != NULL; ++c) {
+        assert(c < 21); /* 14 terraintypes at the moment, if more then 20 increase the array! */
+        if (cost[c]) {
+            fl->type->coasts[k] = (terrain_type *)newterrain(c);
+            k++;
+        }
+    }
+}
+
+
 unit *owner_buildingtyp(const region * r, const building_type * bt)
 {
     building *b;
@@ -1815,11 +1969,23 @@ sail(unit * u, order * ord, bool move_on_land, region_list ** routep)
     if (!ship_ready(starting_point, u, ord))
         return;
 
+    if (sh->type == st_find("fleet")){
+        fleetdamage_to_ships(sh);
+        init_fleet(sh);
+    }
+
+    if (!ship_ready(starting_point, u))
+        return;
+
+    if (sh->type == st_find("fleet")) {
+        k = sh->type->range; /* shipspeed for fleets is already init_fleet */
+    }
+    else {
+        k = shipspeed(sh, u);
+    }
+
     /* Wir suchen so lange nach neuen Richtungen, wie es geht. Diese werden
-     * dann nacheinander ausgeführt. */
-
-    k = shipspeed(sh, u);
-
+    * dann nacheinander ausgeführt. */
     last_point = starting_point;
     current_point = starting_point;
 
@@ -2039,6 +2205,20 @@ sail(unit * u, order * ord, bool move_on_land, region_list ** routep)
             caught_target(current_point, u);
 
         sh = move_ship(sh, starting_point, current_point, *routep);
+
+        if (sh->type == st_find("fleet")){
+            /* move all ships of the fleet */
+            ship **shp = &sh->region->ships;
+            while (*shp) {
+                ship *sh2 = *shp;
+
+                if (sh2->fleet == sh){
+                    sh2 = move_ship(sh, starting_point, current_point, *routep); // Needs Testing!!!
+                }
+                if (*shp == sh)
+                    shp = &sh->next;
+            }
+        }
 
         /* Hafengebühren ? */
 

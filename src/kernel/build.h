@@ -70,8 +70,7 @@ extern "C" {
     extern int leave_cmd(struct unit *u, struct order *ord);
 
     void build_road(struct unit *u, int size, direction_t d);
-    void create_ship(struct unit *u, const struct ship_type *newtype,
-        int size, struct order *ord);
+    void create_ship(struct unit *u, struct ship_type *newtype, int size, struct order *ord); /* CTD const*/
     void continue_ship(struct unit *u, int size);
 
     struct building *getbuilding(const struct region *r);

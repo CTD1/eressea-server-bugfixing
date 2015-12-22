@@ -236,7 +236,7 @@ static void test_ships(CuTest * tc)
         "}}}";
 
     cJSON *json = cJSON_Parse(data);
-    const ship_type *st;
+    ship_type *st; /* CTD const */
     const terrain_type *ter;
 
     test_cleanup();
@@ -412,7 +412,7 @@ static const char * ship_defaults_data = "{\"ships\": { "
 static void test_ships_default(CuTest * tc)
 {
     cJSON *json = cJSON_Parse(ship_defaults_data);
-    const ship_type *st;
+    ship_type *st; /* CTD const */
     ship_type clone;
 
     test_cleanup();

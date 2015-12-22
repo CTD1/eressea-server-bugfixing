@@ -64,7 +64,7 @@ extern "C" {
 
     /* Alte Schiffstypen: */
 
-    const ship_type *st_find(const char *name);
+    ship_type *st_find(const char *name); /* CTD const */
     ship_type *st_get_or_create(const char *name);
     void free_shiptypes(void);
 
@@ -92,8 +92,10 @@ extern "C" {
         int size;
         int damage;                 /* damage in 100th of a point of size */
         int flags;
-        const struct ship_type *type;
+        struct ship_type *type; /* CTD const */
         direction_t coast;
+        struct ship *fleet;  /* pointer to the fleet ship, if this ship is part of a fleet*/
+        int fleet_no; /* needed for reading back in save.c */
     } ship;
 
     void damage_ship(struct ship * sh, double percent);
@@ -105,15 +107,13 @@ extern "C" {
     extern int shipcapacity(const struct ship *sh);
     extern void getshipweight(const struct ship *sh, int *weight, int *cabins);
 
-    extern ship *new_ship(const struct ship_type *stype, struct region *r,
-        const struct locale *lang);
+    extern ship *new_ship( struct ship_type *stype, struct region *r, const struct locale *lang); /* CTD const */
     extern const char *write_shipname(const struct ship *sh, char *buffer,
         size_t size);
     extern struct ship *findship(int n);
     extern struct ship *findshipr(const struct region *r, int n);
 
-    extern const struct ship_type *findshiptype(const char *s,
-        const struct locale *lang);
+    extern struct ship_type *findshiptype(const char *s, const struct locale *lang); /* CTD const */
 
     extern void write_ship_reference(const struct ship *sh,
     struct storage *store);
@@ -126,6 +126,7 @@ extern "C" {
     void ship_setname(struct ship *self, const char *name);
     int shipspeed(const struct ship *sh, const struct unit *u);
     int crew_skill(const struct ship *sh);
+    extern void fleet(struct region * r);
 
     int ship_damage_percent(const struct ship *ship);
 #ifdef __cplusplus
