@@ -1839,7 +1839,7 @@ void init_fleet(ship *fl)
             range = _min(range, k);
             if (sh->type->cabins)
                 cabins = cabins + sh->type->cabins;
-            cargo = cargo + sh->type->cargo;
+            cargo = cargo + shipcapacity(sh);
             if (sh->type->fishing > 0)
                 fishing = fishing + sh->type->fishing;
             at_bonus = _min(at_bonus, sh->type->at_bonus);
@@ -1966,23 +1966,15 @@ sail(unit * u, order * ord, bool move_on_land, region_list ** routep)
         return;
     }
 
-    if (!ship_ready(starting_point, u, ord))
-        return;
-
     if (sh->type == st_find("fleet")){
         fleetdamage_to_ships(sh);
         init_fleet(sh);
     }
 
-    if (!ship_ready(starting_point, u))
+    if (!ship_ready(starting_point, u, ord))
         return;
 
-    if (sh->type == st_find("fleet")) {
-        k = sh->type->range; /* shipspeed for fleets is already init_fleet */
-    }
-    else {
         k = shipspeed(sh, u);
-    }
 
     /* Wir suchen so lange nach neuen Richtungen, wie es geht. Diese werden
     * dann nacheinander ausgeführt. */

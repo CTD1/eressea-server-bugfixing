@@ -651,8 +651,9 @@ faction * f)
 
 /* prints a ship */
 static void
-cr_output_ship(FILE * F, const ship * sh, const unit * u, int fcaptain,
-const faction * f, const region * r)
+cr_output_ship(FILE * F, ship * sh, const unit * u, int fcaptain,
+const faction * f, const region * r) /* CTD const (FILE * F, const ship * sh, const unit * u, int fcaptain,
+const faction * f, const region * r)*/
 {
     int w = 0;
     assert(sh);
@@ -677,12 +678,23 @@ const faction * f, const region * r)
     /* calculate cargo */
     if (u && (u->faction == f || omniscient(f))) {
         int n = 0, p = 0;
+        if (sh->type == st_find("fleet")) {
+            fleetdamage_to_ships(sh);
+            init_fleet(sh);
+        }
         int mweight = shipcapacity(sh);
         getshipweight(sh, &n, &p);
 
         fprintf(F, "%d;capacity\n", mweight);
         fprintf(F, "%d;cargo\n", n);
+        if (sh->type->cabins) {
+            fprintf(F, "%d;cabins\n", sh->type->cabins);
+            fprintf(F, "%d;cabins_used\n", p);
+        }
         fprintf(F, "%d;speed\n", shipspeed(sh, u));
+        if (sh->fleet) {
+            fprintf(F, "%d;fleet\n", sh->fleet->no);
+        }
     }
     /* shore */
     w = NODIRECTION;

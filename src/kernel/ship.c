@@ -28,6 +28,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "unit.h"
 #include "item.h"
 #include "keyword.h"
+#include "move.h"
 #include "race.h"
 #include "region.h"
 #include "skill.h"
@@ -298,8 +299,10 @@ int crew_skill(const ship *sh) {
     return n;
 }
 
-int shipspeed(const ship * sh, const unit * u)
+int shipspeed(ship * sh, const unit * u) /* CTD const (const ship * sh, const unit * u)*/
 {
+    assert(sh);
+
     int k = sh->type->range;
     static const struct curse_type *stormwind_ct, *nodrift_ct;
     static bool init;
@@ -307,11 +310,24 @@ int shipspeed(const ship * sh, const unit * u)
     struct curse *c;
     int bonus;
 
-    assert(sh);
     if (!u) u = ship_owner(sh);
     if (!u) return 0;
-    assert(u->ship == sh);
+    if (sh->fleet){
+        assert(u->ship == sh->fleet);
+    }
+    else
+    {
+        assert(u->ship == sh);
+    }
     assert(u == ship_owner(sh));
+
+    if (sh->type == st_find("fleet")) {
+        fleetdamage_to_ships(sh);
+        init_fleet(sh);
+        k = sh->type->range; /* shipspeed for fleets is already init_fleet */
+        return k;
+    }
+
     assert(sh->type->construction);
     assert(sh->type->construction->improvement == NULL);  /* sonst ist construction::size nicht ship_type::maxsize */
 
@@ -447,13 +463,13 @@ void ship_update_owner(ship * sh) {
     sh->_owner = ship_owner_ex(sh, owner ? owner->faction : 0);
 }
 
-unit *ship_owner(ship * sh) /* CTD const (const ship * sh)*/
+unit *ship_owner(ship * sh) /*CTD const (const ship * sh)*/
 {
     unit *owner = sh->_owner;
     if (sh->fleet) {
         owner = ship_owner(sh->fleet);
     }
-    if (!owner || (owner->ship != sh || owner->number <= 0)) {
+    if (!owner || ((!sh->fleet && owner->ship != sh) || (sh->fleet && owner->ship != sh->fleet) || owner->number <= 0)) {
         unit * heir = ship_owner_ex(sh, owner ? owner->faction : 0);
         return (heir && heir->number > 0) ? heir : 0;
     }
@@ -497,13 +513,11 @@ void fleet(region * r)
             if (getkeyword(ord) == K_FLEET) {
                 char token[128];
                 param_t p;
-                int id;
                 const char * s;
 
                 init_order(ord);
                 s = gettoken(token, sizeof(token));
                 p = findparam_ex(s, u->faction->locale);
-                id = getid();
 
                 // Minimum Segeln 6
                 if (effskill(u, SK_SAILING, 0) < 6 || !(fval(u_race(u), RCF_CANSAIL))) {
@@ -520,21 +534,21 @@ void fleet(region * r)
                     if (!sh || sh->type == st_find("fleet")) {
                         // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
                         // Kein Schiff oder eine Flotte angegeben, nur einzelne Schiffe können in eine Flotte.
-                        return;
+                        break;
                     }
                     // Wass wenn garkeiner auf dem Schiff ist??????
                     // Muss dringend gebrüft werden!! -> OK
                     if (ship_owner(sh) && !ucontact(u, ship_owner(sh))) {
                         /* Prueft, ob u den Kontaktiere-Befehl zum Schiffsbesitzer gesetzt ist */
                         // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
-                        return;
+                        break;
                     }
 
                     // aber nur wenn nicht schon Chef einer Flotte!
                     if (u->ship && u->ship->type == st_find("fleet")) {
                         if (ship_owner(u->ship) == u) {
                             // Error, Einheit ist schon Flottencheff cmistake(u, u->thisorder, 20, MSG_PRODUCE);
-                            return;
+                            break;
                         }
                     }
 
@@ -575,25 +589,26 @@ void fleet(region * r)
                                         uptr = &u2->next;
                                 }
                             }
+                            break;
 
                 case P_JOIN:
                     fl = u->ship;
                     if (!fl || fl->type != st_find("fleet") || ship_owner(fl) != u) {
                         // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
                         // error only fleet kaptn can add ships!
-                        return;
+                        break;
                     }
 
                     if (!sh || sh->type == st_find("fleet")) {
                         // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
                         // Kein Schiff oder eine Flotte angegeben, nur einzelne Schiffe können in eine Flotte.
-                        return;
+                        break;
                     }
 
                     if (fl == sh->fleet) {
                         // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
                         // error ship is already in the fleet!
-                        return;
+                        break;
                     }
 
                     sh->_owner = u; // aber u ist auf der flotte, nicht auf dem Schiff! Sicherstellen das da nix schief geht! -> ship_owner
@@ -626,25 +641,25 @@ void fleet(region * r)
 
                         }
                     }
-
+                    break;
                 case P_LEAVE:
                     fl = u->ship;
                     if (!fl || fl->type != st_find("fleet") || ship_owner(fl) != u) {
                         // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
                         // error only fleet kapt'n can add ships!
-                        return;
+                        break;
                     }
 
                     if (!sh || sh->type == st_find("fleet")) {
                         // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
                         // Kein Schiff oder eine Flotte angegeben, nur einzelne Schiffe können die Flotte verlassen.
-                        return;
+                        break;
                     }
 
                     if (fl != sh->fleet) {
                         // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
                         // error ship is not part of the fleet!
-                        return;
+                        break;
                     }
 
                     fl->size--;

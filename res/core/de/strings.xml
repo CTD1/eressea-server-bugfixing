@@ -522,6 +522,10 @@
     <text locale="de">fliegender Teppich</text>
     <text locale="en">flying carpet</text>
   </string>
+  <string name="fleet">
+    <text locale="de">Flotte</text>
+    <text locale="en">fleet</text>
+  </string>
   <string name="balloon">
     <text locale="de">Ballon</text>
   </string>
@@ -2050,6 +2054,18 @@
   </string>
   <string name="ZAUBER">
     <text locale="de">ZAUBER</text>
+  </string>
+    <string name="FLEET">
+    <text locale="de">FLOTTE</text>
+  </string>
+    <string name="CREATE">
+    <text locale="de">ERSTELLEN</text>
+  </string>
+  <string name="JOIN">
+    <text locale="de">BEITRETEN</text>
+  </string>
+  <string name="LEAVE">
+    <text locale="de">VERLASSEN</text>
   </string>
 
   <string name="XEPOTION">

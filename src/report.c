@@ -1797,16 +1797,26 @@ const unit * captain)
     size_t size = sizeof(buffer) - 1;
     int bytes;
     char ch;
+    char fleet_trailer[4] = "";
 
-    newline(out);
-
+    if (sh->fleet) {
+        strcpy (fleet_trailer, "|- ");
+    } else {
+        // fleet_trailer = "";
+        newline(out);
+    }
+     
     if (captain && captain->faction == f) {
         int n = 0, p = 0;
         getshipweight(sh, &n, &p);
         n = (n + 99) / 100;         /* 1 Silber = 1 GE */
 
-        bytes = _snprintf(bufp, size, "%s, %s, (%d/%d)", shipname(sh),
-            LOC(f->locale, sh->type->_name), n, shipcapacity(sh) / 100);
+        if (sh->type->cabins) {
+            bytes = _snprintf(bufp, size, "%s%s, %s, (%d/%d) (%d/%d)",fleet_trailer, shipname(sh), LOC(f->locale, sh->type->_name), n, shipcapacity(sh) / 100, p / 100, sh->type->cabins / 100);
+        } else {
+            bytes = _snprintf(bufp, size, "%s%s, %s, (%d/%d)",fleet_trailer, shipname(sh), LOC(f->locale, sh->type->_name), n, shipcapacity(sh) / 100);
+        }
+
     }
     else {
         bytes =
@@ -2331,6 +2341,7 @@ const char *charset)
         int stealthmod = stealth_modifier(sr->mode);
         building *b = r->buildings;
         ship *sh = r->ships;
+        ship *fl = r->ships;
 
         if (sr->mode < see_lighthouse)
             continue;
@@ -2427,12 +2438,30 @@ const char *charset)
             u = u->next;
         }
         while (sh) {
+
             while (sh && (!u || u->ship != sh)) {
-                nr_ship(out, sr, sh, f, NULL);
+                assert(sh->type != st_find("fleet")); // No emty fleets, Fleets without unit should already be removed!
+                if (!sh->fleet) {                     // Ship is part of a fleet and sould be printed under the fleet!
+                    nr_ship(out, sr, sh, f, NULL);
+                }
                 sh = sh->next;
             }
             if (sh) {
-                nr_ship(out, sr, sh, f, u);
+                assert(!sh->fleet);                   // Ships that are part of a fleet should never have a unit inside
+                if (sh->type == st_find("fleet")) {
+                    fleetdamage_to_ships(sh);
+                    init_fleet(sh);
+                    nr_ship(out, sr, sh, f, u);
+                    fl = r->ships;
+                    while (fl) {
+                        if (fl->fleet == sh) {
+                            nr_ship(out, sr, fl, f, u);
+                        }
+                        fl = fl->next;
+                    }
+                } else {
+                    nr_ship(out, sr, sh, f, u);
+                }
                 while (u && u->ship == sh) {
                     nr_unit(out, f, u, 6, sr->mode);
                     u = u->next;
