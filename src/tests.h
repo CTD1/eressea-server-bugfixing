@@ -41,7 +41,7 @@ extern "C" {
     struct building * test_create_building(struct region * r, const struct building_type * btype);
     struct ship * test_create_ship(struct region * r, struct ship_type * stype); /* CTD const (struct region * r, const struct ship_type * stype)*/
     struct item_type * test_create_itemtype(const char * name);
-    struct ship_type *test_create_shiptype(char * name); /* CTD const (const char * name)*/
+    struct ship_type *test_create_shiptype(const char * name); /* CTD const */
     struct building_type *test_create_buildingtype(const char *name);
     void test_create_castorder(struct castorder *co, struct unit *u, int level, float force, int range, struct spellparameter *par);
     struct spell * test_create_spell(void);

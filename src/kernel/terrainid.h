@@ -14,6 +14,8 @@
 extern "C" {
 #endif
 
+#define MAXTERRAINS 14
+
   enum {
     T_OCEAN = 0,
     T_PLAIN,

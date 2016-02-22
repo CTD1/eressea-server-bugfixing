@@ -507,7 +507,11 @@ static double overload(const region * r, ship * sh)
 
 int enoughsailors(const ship * sh, int crew_skill)
 {
-    return crew_skill >= sh->type->sumskill;
+    if (sh->type == st_find("fleet")) {
+        return crew_skill >= sh->fleet_type->sumskill;
+    } else {
+        return crew_skill >= sh->type->sumskill;
+    }
 }
 
 /* ------------------------------------------------------------- */
@@ -1729,9 +1733,9 @@ static bool ship_ready(const region * r, unit * u, order * ord)
             u->ship));
         return false;
     }
-    if (u->ship->type == st_find("fleet") && u->ship->no > u->no) {
+    if (u->ship->type == st_find("fleet") && u->ship->size > u->number) {
         ADDMSG(&u->faction->msgs, msg_feedback(u, ord,
-            "error_fleet_no_low", "value ship", u->ship->no,
+            "error_fleet_no_low", "value ship", u->ship->size,
             u->ship));
         return false;
     }
@@ -1867,7 +1871,7 @@ void init_fleet(ship *fl)
                 flying = 0;
             if (!sh->type->flags & SFL_OPENSEA)
                 opensea = 0;
-            for (c = 0; newterrain(c) != NULL; ++c) {
+            for (c = 0; c < MAXTERRAINS ; ++c) {
                 assert(c < 21); /* 14 terraintypes at the moment, if more then 20 increase the array! */
                 if (cost[c]) {
                     cost[c] = ship_allowed_terrain(newterrain(c), sh);
@@ -1904,7 +1908,7 @@ void init_fleet(ship *fl)
         fl->flags |= SFL_FLY;
     if (opensea)
         fl->flags |= SFL_OPENSEA;
-    for (c = 0; newterrain(c) != NULL; ++c) {
+    for (c = 0; c < MAXTERRAINS; ++c) {
         assert(c < 21); /* 14 terraintypes at the moment, if more then 20 increase the array! */
         if (cost[c]) {
             fl->type->coasts[k] = (terrain_type *)newterrain(c);
