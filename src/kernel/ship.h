@@ -96,11 +96,12 @@ extern "C" {
         direction_t coast;
         struct ship *fleet;  /* pointer to the fleet ship, if this ship is part of a fleet*/
         int fleet_no; /* needed for reading back in save.c */
+        struct ship_type *fleet_type; /* CTD const */
     } ship;
 
     void damage_ship(struct ship * sh, double percent);
     void ship_set_owner(struct unit * u);
-    struct unit *ship_owner(const struct ship *sh);
+    struct unit *ship_owner(struct ship *sh); /* CTD const (const struct ship *sh) */
     void ship_update_owner(struct ship * sh);
 
     extern const char *shipname(const struct ship *self);
@@ -124,7 +125,7 @@ extern "C" {
 
     const char *ship_getname(const struct ship *self);
     void ship_setname(struct ship *self, const char *name);
-    int shipspeed(const struct ship *sh, const struct unit *u);
+    int shipspeed(struct ship *sh, const struct unit *u); /* CTD const (const struct ship *sh, const struct unit *u)*/
     int crew_skill(const struct ship *sh);
     extern void fleet(struct region * r);
 

@@ -688,8 +688,13 @@ const faction * f, const region * r)*/
         fprintf(F, "%d;capacity\n", mweight);
         fprintf(F, "%d;cargo\n", n);
         if (sh->type->cabins) {
-            fprintf(F, "%d;cabins\n", sh->type->cabins);
-            fprintf(F, "%d;cabins_used\n", p);
+            if (sh->type == st_find("fleet")) {
+                fprintf(F, "%d;cabins\n", sh->fleet_type->cabins);
+                fprintf(F, "%d;cabins_used\n", p);
+            } else {
+                fprintf(F, "%d;cabins\n", sh->type->cabins);
+                fprintf(F, "%d;cabins_used\n", p);
+            }
         }
         fprintf(F, "%d;speed\n", shipspeed(sh, u));
         if (sh->fleet) {
@@ -1255,10 +1260,23 @@ static void cb_cr_travelthru_ship(region *r, unit *u, void *cbdata) {
     FILE *F = data->file;
 
     if (u->ship && travelthru_cansee(r, f, u)) {
+        ship **shp = &u->region->ships;
         if (data->n++ == 0) {
             fprintf(F, "DURCHSCHIFFUNG\n");
         }
-        fprintf(F, "\"%s\"\n", shipname(u->ship));
+        if (u->ship->type != st_find("fleet")) {
+            fprintf(F, "\"%s\"\n", shipname(u->ship));
+        }
+        else {
+            while (*shp) {
+                ship *sh = *shp;
+                if (ship_owner(sh) == u) {
+                    fprintf(F, "\"%s\"\n", shipname(sh));
+                }
+                shp = &sh->next;
+                sh = *shp;
+            }
+        }
     }
 }
 

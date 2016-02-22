@@ -458,7 +458,7 @@ static void test_follow_ship_msg(CuTest * tc) {
     ship * sh;
     faction *f;
     unit *u;
-    const ship_type *stype;
+    ship_type *stype; /* CTD const */
     message *msg;
     order *ord;
 

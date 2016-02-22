@@ -18,6 +18,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #include <platform.h>
 #include <kernel/config.h>
+#include <kernel/messages.h>
 #include <kernel/order.h>
 #include "ship.h"
 
@@ -193,6 +194,9 @@ ship *new_ship(ship_type * stype, region * r, const struct locale *lang) /* CTD 
     sh->no = newcontainerid();
     sh->coast = NODIRECTION;
     sh->type = stype;
+    if (stype == st_find("fleet")) {
+        sh->fleet_type = stype;
+    }
     sh->region = r;
 
     if (lang) {
@@ -324,8 +328,7 @@ int shipspeed(ship * sh, const unit * u) /* CTD const (const ship * sh, const un
     if (sh->type == st_find("fleet")) {
         fleetdamage_to_ships(sh);
         init_fleet(sh);
-        k = sh->type->range; /* shipspeed for fleets is already init_fleet */
-        return k;
+        k = sh->fleet_type->range; 
     }
 
     assert(sh->type->construction);
@@ -519,28 +522,30 @@ void fleet(region * r)
                 s = gettoken(token, sizeof(token));
                 p = findparam_ex(s, u->faction->locale);
 
-                // Minimum Segeln 6
-                if (effskill(u, SK_SAILING, 0) < 6 || !(fval(u_race(u), RCF_CANSAIL))) {
-                    // TODO Fecmistake(u, u->thisorder, 100, MSG_PRODUCE);
-                    return;
-                }
-                /* Die Schiffsnummer bzw der Schiffstyp wird eingelesen */
+                /* read the ship */
                 sh = getship(r);
 
                 switch (p) {
-                case P_CREATE:
+                    case P_CREATE:
                     if (!sh)
                         sh = u->ship;
-                    if (!sh || sh->type == st_find("fleet")) {
-                        // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
-                        // Kein Schiff oder eine Flotte angegeben, nur einzelne Schiffe können in eine Flotte.
+
+                    // Minimum skill 6
+                    if (effskill(u, SK_SAILING, 0) < 6 || !(fval(u_race(u), RCF_CANSAIL))) {
+                        ADDMSG(&u->faction->msgs, msg_feedback(u, ord,
+                            "fleetcaptain_skill_low", "minskill", 6));
                         break;
                     }
-                    // Wass wenn garkeiner auf dem Schiff ist??????
-                    // Muss dringend gebrüft werden!! -> OK
-                    if (ship_owner(sh) && !ucontact(u, ship_owner(sh))) {
-                        /* Prueft, ob u den Kontaktiere-Befehl zum Schiffsbesitzer gesetzt ist */
-                        // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
+
+                    if (!sh || sh->type == st_find("fleet") || sh->region != u->region) {
+                        cmistake(u, ord, 20, MSG_MOVE);
+                        /* No ship or fleet. only singel ships can be added to a fleet*/
+                        break;
+                    }
+
+                    if (ship_owner(sh) && !ucontact(ship_owner(sh), u)) {
+                        /* Prueft, ob der Kontaktiere-Befehl vom Schiffsbesitzer gesetzt worde */
+                        ADDMSG(&u->faction->msgs, msg_feedback(u, ord, "feedback_no_contact", "target", ship_owner(sh)));
                         break;
                     }
 
@@ -562,10 +567,6 @@ void fleet(region * r)
                             sh->_owner = u; // aber u ist auf der flotte, nicht auf dem Schiff! Sicherstellen das da nix schief geht! -> ship_owner
                             fl->size = 1;
                             sh->fleet = fl;
-                            // u ans ende der Region sortieren??
-
-                            // add to fleet
-
                             /* all units leave the ship and go to the fleet */
                             for (u2 = r->units; u2; u2 = u2->next) {
                                 if (u2->ship == sh) {
@@ -591,31 +592,48 @@ void fleet(region * r)
                             }
                             break;
 
-                case P_JOIN:
-                    fl = u->ship;
-                    if (!fl || fl->type != st_find("fleet") || ship_owner(fl) != u) {
-                        // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
-                        // error only fleet kaptn can add ships!
-                        break;
-                    }
+                            case P_JOIN:
+                                fl = u->ship;
+                                if (!fl || fl->type != st_find("fleet") || ship_owner(fl) != u) {
+                                    ADDMSG(&u->faction->msgs, msg_feedback(u, ord, "error_fleet_join", ""));
+                                    // error only fleet kaptn can add ships!
+                                    break;
+                                }
 
-                    if (!sh || sh->type == st_find("fleet")) {
-                        // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
-                        // Kein Schiff oder eine Flotte angegeben, nur einzelne Schiffe können in eine Flotte.
-                        break;
-                    }
+                                if (!sh || sh->type == st_find("fleet") || sh->region != u->region) {
+                                    cmistake(u, ord, 20, MSG_MOVE);
+                                    /* No ship or fleet. only singel ships can be added to a fleet*/
+                                    break;
+                                }
 
-                    if (fl == sh->fleet) {
-                        // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
-                        // error ship is already in the fleet!
-                        break;
-                    }
+                                if (fl == sh->fleet) {
+                                    /* ship is already in the fleet, no error msg needed */
+                                    break;
+                                }
+                                if (u->number <= fl->size) {
+                                    ADDMSG(&u->faction->msgs, msg_feedback(u, ord,
+                                        "error_fleet_no_low", "value ship", u->ship->type->cptskill,
+                                        u->ship));
+                                    break;
+                                }
 
-                    sh->_owner = u; // aber u ist auf der flotte, nicht auf dem Schiff! Sicherstellen das da nix schief geht! -> ship_owner
-                    fl->size++;
-                    sh->fleet = fl;
+                                // Minimum sailing skill 6
+                                if (effskill(u, SK_SAILING, 0) < 6 || !(fval(u_race(u), RCF_CANSAIL))) {
+                                    ADDMSG(&u->faction->msgs, msg_feedback(u, ord,
+                                        "fleetcaptain_skill_low", "minskill", 6));
+                                    break;
+                                }
 
-                    // add to fleet
+                                if (ship_owner(sh) && !ucontact(ship_owner(sh), u)) {
+                                    /* Prueft, ob der Kontaktiere-Befehl vom Schiffsbesitzer gesetzt worde */
+                                    ADDMSG(&u->faction->msgs, msg_feedback(u, ord, "feedback_no_contact", "target", ship_owner(sh)));
+                                    break;
+                                }
+
+                                sh->_owner = u; // aber u ist auf der flotte, nicht auf dem Schiff! Sicherstellen das da nix schief geht! -> ship_owner
+                                fl->size++;
+                                sh->fleet = fl;
+                                // add to fleet
 
                     /* all units leave the ship and go to the fleet */
                     for (u2 = r->units; u2; u2 = u2->next) {
@@ -645,19 +663,19 @@ void fleet(region * r)
                 case P_LEAVE:
                     fl = u->ship;
                     if (!fl || fl->type != st_find("fleet") || ship_owner(fl) != u) {
-                        // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
-                        // error only fleet kapt'n can add ships!
+                        ADDMSG(&u->faction->msgs, msg_feedback(u, ord, "error_fleet_join", ""));
+                        // error only fleet kapt'n can drop ships!
                         break;
                     }
-
-                    if (!sh || sh->type == st_find("fleet")) {
-                        // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
+                    
+                    if (!sh || sh->type == st_find("fleet") || sh->region != u->region) {
+                        cmistake(u, ord, 20, MSG_MOVE);
                         // Kein Schiff oder eine Flotte angegeben, nur einzelne Schiffe können die Flotte verlassen.
                         break;
                     }
 
                     if (fl != sh->fleet) {
-                        // cmistake(u, u->thisorder, 20, MSG_PRODUCE);
+                        cmistake(u, ord, 20, MSG_MOVE);
                         // error ship is not part of the fleet!
                         break;
                     }
@@ -674,10 +692,6 @@ void fleet(region * r)
                     break;
                         }
                     }
-
-                    sh->fleet = u->ship;
-                    sh->_owner = ship_owner(u->ship);
-
                 }
             }
             if (*ordp == ord)

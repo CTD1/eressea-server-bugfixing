@@ -1729,6 +1729,12 @@ static bool ship_ready(const region * r, unit * u, order * ord)
             u->ship));
         return false;
     }
+    if (u->ship->type == st_find("fleet") && u->ship->no > u->no) {
+        ADDMSG(&u->faction->msgs, msg_feedback(u, ord,
+            "error_fleet_no_low", "value ship", u->ship->no,
+            u->ship));
+        return false;
+    }
     if (u->ship->type->construction) {
         assert(!u->ship->type->construction->improvement);     /* sonst ist construction::size nicht ship_type::maxsize */
         if (u->ship->size != u->ship->type->construction->maxsize) {
@@ -1775,9 +1781,13 @@ void fleetdamage_to_ships(ship *fl)
             {
                 damage_ship(sh, fl->damage);
                 if (sh->damage >= sh->size * DAMAGE_SCALE) {
+                    if (sh->region) {
+                        //  ADDMSG(&f->msgs, msg_message("shipsink", "ship", sh));
+                    }
                     remove_ship(shp, sh);
                     fl->size = fl->size - 1;
-                    fl->type->construction->maxsize = fl->size;
+                    fl->type->construction->maxsize = fl->size;  /*ToDo: remove when conversion to fleet_type is finished*/
+                    fl->fleet_type->construction->maxsize = fl->size;
                 }
             }
             if (*shp == sh)
@@ -1785,6 +1795,9 @@ void fleetdamage_to_ships(ship *fl)
         }
         if (fl->size <= 0)
         {
+            if (fl->region) {
+                //  ADDMSG(&f->msgs, msg_message("shipsink", "ship", fl));
+            }
             remove_ship(shp, fl);
         }
     }
@@ -1898,6 +1911,28 @@ void init_fleet(ship *fl)
             k++;
         }
     }
+    /*New fleet_type to handle all fleet values.*/
+    /*ToDo: find all places in the code where type is used, add fleets there and then change back type to static*/
+
+    fl->fleet_type->construction->maxsize = ships_in_fleet;
+    fl->fleet_type->construction->improvement = NULL; /* Otherwise it looks like the (fleet)ship is not finished*/
+    fl->fleet_type->cptskill = cptskill;
+    fl->fleet_type->sumskill = sumskill;
+    fl->fleet_type->range = range;
+    if (cabins > 0)
+        fl->fleet_type->cabins = cabins;
+    fl->fleet_type->cargo = cargo;
+    if (fishing > 0) {
+        fl->fleet_type->fishing = fishing;
+        fl->flags |= SF_FISHING;
+    }
+    fl->fleet_type->at_bonus = at_bonus;
+    fl->fleet_type->df_bonus = df_bonus;
+    fl->fleet_type->tac_bonus = tac_bonus;
+    fl->fleet_type->minskill = minskill;
+    fl->fleet_type->range_max = range_max;
+    fl->fleet_type->storm = storm;
+
 }
 
 
@@ -2055,6 +2090,15 @@ sail(unit * u, order * ord, bool move_on_land, region_list ** routep)
                                 break;
                             }
 
+                            if (sh->fleet) {
+                                fleetdamage_to_ships(sh);
+                                if (sh->size <= 0) {
+                                    /* fleet destroyed, end journey here */
+                                    break;
+                                }
+
+                            }
+
                             next_point = rnext;
                             /* these values need to be updated if next_point changes (due to storms): */
                             tnext = next_point->terrain;
@@ -2156,6 +2200,18 @@ sail(unit * u, order * ord, bool move_on_land, region_list ** routep)
         }
     }
 
+    if (sh->fleet) {
+        fleetdamage_to_ships(sh);
+        if (sh->size <= 0) {
+            if (sh->region) {
+                ADDMSG(&f->msgs, msg_message("shipsink", "ship", sh));
+                remove_ship(&sh->region->ships, sh);
+            }
+            sh = NULL;
+        }
+    }
+
+
     if (sh->damage >= sh->size * DAMAGE_SCALE) {
         if (sh->region) {
             ADDMSG(&f->msgs, msg_message("shipsink", "ship", sh));
@@ -2163,6 +2219,7 @@ sail(unit * u, order * ord, bool move_on_land, region_list ** routep)
         }
         sh = NULL;
     }
+
 
     /* Nun enthält current_point die Region, in der das Schiff seine Runde
      * beendet hat. Wir generieren hier ein Ereignis für den Spieler, das
@@ -2196,19 +2253,32 @@ sail(unit * u, order * ord, bool move_on_land, region_list ** routep)
         if (fval(u, UFL_FOLLOWING))
             caught_target(current_point, u);
 
+        struct ship **shp2 = &sh->region->ships;
+
         sh = move_ship(sh, starting_point, current_point, *routep);
 
         if (sh->type == st_find("fleet")){
             /* move all ships of the fleet */
-            ship **shp = &sh->region->ships;
-            while (*shp) {
-                ship *sh2 = *shp;
+            while (*shp2) {
+                ship *sh2 = *shp2;
 
                 if (sh2->fleet == sh){
-                    sh2 = move_ship(sh, starting_point, current_point, *routep); // Needs Testing!!!
+                    if (!move_on_land) {
+                        set_coast(sh2, last_point, current_point);
+                    }
+
+                    if (is_cursed(sh->attribs, C_SHIP_FLYING, 0)) {
+                        ADDMSG(&f->msgs, msg_message("shipfly", "ship from to", sh2,
+                            starting_point, current_point));
+                    }
+                    else {
+                        ADDMSG(&f->msgs, msg_message("shipsail", "ship from to", sh2,
+                            starting_point, current_point));
+                    }
+                    sh2 = move_ship(sh2, starting_point, current_point, *routep); // Needs Testing!!!
                 }
-                if (*shp == sh)
-                    shp = &sh->next;
+                if (*shp2 == sh2)
+                    shp2 = &sh2->next;
             }
         }
 

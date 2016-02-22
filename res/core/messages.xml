@@ -8347,6 +8347,18 @@
     <text locale="en">"$unit($unit) in $region($region): '$order($command)' - The captain needs a sailing skill of at least $int($value), to command $ship($ship)."</text>
   </message>
 
+  <message name="error_fleet_no_low" section="errors">
+    <type>
+      <arg name="region" type="region"/>
+      <arg name="unit" type="unit"/>
+      <arg name="command" type="order"/>
+      <arg name="value" type="int"/>
+      <arg name="ship" type="ship"/>
+    </type>
+    <text locale="de">"$unit($unit) in $region($region): '$order($command)' - Der Flottenkapitän muß mindestens $int($value) Personen haben, um $ship($ship) zu befehligen."</text>
+    <text locale="en">"$unit($unit) in $region($region): '$order($command)' - The fleetcaptain needs at least $int($value) people, to command $ship($ship)."</text>
+  </message>
+
   <message name="error_roads_finished" section="errors">
     <type>
       <arg name="region" type="region"/>
@@ -8419,5 +8431,28 @@
     <text locale="de">"$unit($unit) in $region($region): '$order($command)' - Helden können nicht rekrutieren."</text>
     <text locale="en">"$unit($unit) in $region($region): '$order($command)' - Heroes cannot recruit."</text>
   </message>
+
+    <message name="fleetcaptain_skill_low" section="errors">
+    <type>
+      <arg name="unit" type="unit"/>
+      <arg name="region" type="region"/>
+      <arg name="command" type="order"/>
+      <arg name="minskill" type="int"/>
+    </type>
+    <text locale="de">"$unit($unit) in $region($region): '$order($command)' - Man benötigt mindestens ein Segeltalent von $int($minskill), um eine Flotte zu befehligen."</text>
+    <text locale="en">"$unit($unit) in $region($region): '$order($command)' - You need a sailing skill of at least $int($minskill), to command a fleet."</text>
+  </message>
+  
+  
+  <message name="error_fleet_join" section="errors">
+    <type>
+      <arg name="region" type="region"/>
+      <arg name="unit" type="unit"/>
+      <arg name="command" type="order"/>
+    </type>
+    <text locale="de">"$unit($unit) in $region($region): '$order($command)' - Nur der Flottenkapitän einer Flotte kann andere Schiffe zur Flotte hinzufügen oder ausgliedern."</text>
+    <text locale="en">"$unit($unit) in $region($region): '$order($command)' - Only the fleetcaptain can add or remove ships from a fleet."</text>
+  </message>
+
 
 </messages>

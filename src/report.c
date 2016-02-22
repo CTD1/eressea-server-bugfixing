@@ -1802,7 +1802,6 @@ const unit * captain)
     if (sh->fleet) {
         strcpy (fleet_trailer, "|- ");
     } else {
-        // fleet_trailer = "";
         newline(out);
     }
      
@@ -1812,7 +1811,11 @@ const unit * captain)
         n = (n + 99) / 100;         /* 1 Silber = 1 GE */
 
         if (sh->type->cabins) {
-            bytes = _snprintf(bufp, size, "%s%s, %s, (%d/%d) (%d/%d)",fleet_trailer, shipname(sh), LOC(f->locale, sh->type->_name), n, shipcapacity(sh) / 100, p / 100, sh->type->cabins / 100);
+            if (sh->type == st_find("fleet")) {
+                bytes = _snprintf(bufp, size, "%s%s, %s, (%d/%d) (%d/%d)", fleet_trailer, shipname(sh), LOC(f->locale, sh->type->_name), n, shipcapacity(sh) / 100, p / 100, sh->fleet_type->cabins / 100);
+            } else {
+                bytes = _snprintf(bufp, size, "%s%s, %s, (%d/%d) (%d/%d)", fleet_trailer, shipname(sh), LOC(f->locale, sh->type->_name), n, shipcapacity(sh) / 100, p / 100, sh->type->cabins / 100);
+            }
         } else {
             bytes = _snprintf(bufp, size, "%s%s, %s, (%d/%d)",fleet_trailer, shipname(sh), LOC(f->locale, sh->type->_name), n, shipcapacity(sh) / 100);
         }
@@ -1994,33 +1997,72 @@ static void cb_write_travelthru(region *r, unit *u, void *cbdata) {
             size_t len, size = data->size - (data->writep - data->start);
             const char *str;
             char *writep = data->writep;
+            int fleet = 0;
+            ship **shp = &u->region->ships;
 
-            if (u->ship != NULL) {
-                str = shipname(u->ship);
+            if (u->ship && u->ship->type == st_find("fleet")){
+                fleet = 1;
             }
-            else {
-                str = unitname(u);
-            }
-            len = strlen(str);
-            if (len < size && data->counter <= data->maxtravel) {
-                memcpy(writep, str, len);
-                writep += len;
-                size -= len;
-                if (data->counter == data->maxtravel) {
-                    str = ".";
-                }
-                else if (data->counter + 1 == data->maxtravel) {
-                    str = LOC(f->locale, "list_and");
+            len = 1;
+            str = "";
+            while (fleet >= 0)
+            {
+
+                if (u->ship != NULL ) {
+                    if (fleet == 0){
+                        str = shipname(u->ship);
+                        fleet = -1;
+                    }
+                    if (fleet > 0) {
+                        while (*shp) {
+                            ship *sh = *shp;
+
+                            if (ship_owner(sh) == u) {
+                                str = shipname(sh);
+                                shp = &sh->next;
+                                sh = *shp;
+                                if (!sh){
+                                    fleet = -1;
+                                }
+                                break;
+                            }
+                            else
+                            {
+                                shp = &sh->next;
+                                sh = *shp;
+                                if (!sh){
+                                    fleet = -1;
+                                }
+                            }
+                        }
+                    }
+
                 }
                 else {
-                    str = ", ";
+                    str = unitname(u);
+                    fleet = -1;
                 }
                 len = strlen(str);
-                if (len < size) {
+                if (len < size && data->counter <= data->maxtravel) {
                     memcpy(writep, str, len);
                     writep += len;
                     size -= len;
-                    data->writep = writep;
+                    if (fleet < 1 && data->counter == data->maxtravel) {
+                        str = ".";
+                    }
+                    else if (fleet < 1 && data->counter + 1 == data->maxtravel) {
+                        str = LOC(f->locale, "list_and");
+                    }
+                    else {
+                        str = ", ";
+                    }
+                    len = strlen(str);
+                    if (len < size) {
+                        memcpy(writep, str, len);
+                        writep += len;
+                        size -= len;
+                        data->writep = writep;
+                    }
                 }
             }
             if (len >= size || data->counter == data->maxtravel) {

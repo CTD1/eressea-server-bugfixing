@@ -54,7 +54,7 @@ bool list = false;
 #define ADD_SUITE(name) \
     CuSuite *get_##name##_suite(void); \
     if (list) printf("%s\n", #name); \
-    if (!list || argc>0) add_suite(get_##name##_suite, #name, argc, argv)
+    if (!list || argc > 0) add_suite(get_##name##_suite, #name, argc, argv);
 
 int RunAllTests(int argc, char *argv[])
 {

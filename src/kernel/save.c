@@ -1612,6 +1612,9 @@ int readgame(const char *filename, bool backup)
             READ_INT(&store, &sh->damage);
             if (gdata.version >= FLEETS) {      /* Read fleet no */
                 READ_INT(&store, &sh->fleet_no);
+                if (sh->type == st_find("fleet")) {
+                    sh->fleet_type = sh->type;
+                }
             }
 
             if (gdata.version >= FOSS_VERSION) {
