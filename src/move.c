@@ -473,6 +473,10 @@ static bool cansail(const region * r, ship * sh)
         int n = 0, p = 0;
         int mweight = shipcapacity(sh);
         int mcabins = sh->type->cabins;
+        if (sh->type == st_find("fleet"))
+        {
+            mcabins = sh->fleet_type->cabins;
+        }
 
         getshipweight(sh, &n, &p);
 
@@ -801,12 +805,17 @@ static void drifting_ships(region * r)
             direction_t dir = 0;
             double ovl;
 
+            if (sh->type == st_find("fleet")) 
+            {
+                init_fleet(sh);
+            }
+
             if (sh->type->fishing > 0) {
                 sh->flags |= SF_FISHING;
             }
 
-            /* Schiff schon abgetrieben oder durch Zauber geschützt? */
-            if (!drift || fval(sh, SF_DRIFTED) || is_cursed(sh->attribs, C_SHIP_NODRIFT, 0)) {
+            /* Schiff schon abgetrieben oder durch Zauber geschützt oder Teil einer Flotte? */
+            if (!drift || fval(sh, SF_DRIFTED) || is_cursed(sh->attribs, C_SHIP_NODRIFT, 0 || sh->fleet != NULL)) {
                 shp = &sh->next;
                 continue;
             }
@@ -1758,35 +1767,25 @@ static bool ship_ready(const region * r, unit * u, order * ord)
 }
 
 
-/*
-void init_fleets(void)
-{
-    region *r;
-    for (r = regions; r; r = r->next) {
-        ship **shp = &r->ships;
-        while (*shp) {
-            ship *sh = *shp;
-            if (sh->type == st_find("fleet"))
-                init_fleet(sh);
-        }
-    }
-}
-*/
-
 void fleetdamage_to_ships(ship *fl)
 {
     assert(fl->type == st_find("fleet"));
     if (fl->damage) {
         ship **shp = &fl->region->ships;
-
+        faction *f = NULL;
+        if (ship_owner(fl)){
+            f = ship_owner(fl)->faction;
+        }
+        double damage = ship_damage_percent(fl); // Returns the damage as int in % like 15 = 15% damage
+        fl->damage = 0;
         while (*shp) {
             ship *sh = *shp;
             if (sh->fleet && sh->fleet == fl)
             {
-                damage_ship(sh, fl->damage);
+                damage_ship(sh, damage / DAMAGE_SCALE); // Needs the damage in % as input but as double like 0.15 = 15% damage. ToDo: Fix this, should be everywhere the same !!!
                 if (sh->damage >= sh->size * DAMAGE_SCALE) {
-                    if (sh->region) {
-                        //  ADDMSG(&f->msgs, msg_message("shipsink", "ship", sh));
+                    if (sh->region && f) {
+                        ADDMSG(&f->msgs, msg_message("shipsink", "ship", sh));
                     }
                     remove_ship(shp, sh);
                     fl->size = fl->size - 1;
@@ -1799,9 +1798,10 @@ void fleetdamage_to_ships(ship *fl)
         }
         if (fl->size <= 0)
         {
-            if (fl->region) {
-                //  ADDMSG(&f->msgs, msg_message("shipsink", "ship", fl));
+            if (fl->region && f) {
+                ADDMSG(&f->msgs, msg_message("shipsink", "ship", fl));
             }
+            shp = &fl->region->ships;
             remove_ship(shp, fl);
         }
     }
@@ -1823,6 +1823,10 @@ int ship_allowed_terrain(const terrain_type *terrain, ship *sh)
 void init_fleet(ship *fl)
 {
     assert(fl->type == st_find("fleet"));
+    fleetdamage_to_ships(fl);
+    if (fl->size <= 0){
+        return;
+    }
     int ships_in_fleet = 0; // add
     int sumskill = 0; // add
     int range = INT_MAX; // min
@@ -1841,7 +1845,11 @@ void init_fleet(ship *fl)
     int opensea = 1;
     terrain_t c;
     int k = 0;
-    int cost[20] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+    int coast[MAXTERRAINS];
+
+    for (int r = 0; r < MAXTERRAINS; ++r) {
+        coast[r] = 1;
+    }
 
     ship **shp = &fl->region->ships;
 
@@ -1872,9 +1880,8 @@ void init_fleet(ship *fl)
             if (!sh->type->flags & SFL_OPENSEA)
                 opensea = 0;
             for (c = 0; c < MAXTERRAINS ; ++c) {
-                assert(c < 21); /* 14 terraintypes at the moment, if more then 20 increase the array! */
-                if (cost[c]) {
-                    cost[c] = ship_allowed_terrain(newterrain(c), sh);
+                if (coast[c]) {
+                    coast[c] = ship_allowed_terrain(newterrain(c), sh);
                 }
             }
 
@@ -1903,20 +1910,20 @@ void init_fleet(ship *fl)
     fl->type->range_max = range_max;
     fl->type->storm = storm;
     if (nocoast)
-        fl->flags |= SFL_NOCOAST;
+        fl->type->flags |= SFL_NOCOAST;
     if (flying)
-        fl->flags |= SFL_FLY;
+        fl->type->flags |= SFL_FLY;
     if (opensea)
-        fl->flags |= SFL_OPENSEA;
+        fl->type->flags |= SFL_OPENSEA;
     for (c = 0; c < MAXTERRAINS; ++c) {
-        assert(c < 21); /* 14 terraintypes at the moment, if more then 20 increase the array! */
-        if (cost[c]) {
+        fl->type->coasts[c] = NULL;
+        if (coast[c]) {
             fl->type->coasts[k] = (terrain_type *)newterrain(c);
             k++;
         }
     }
     /*New fleet_type to handle all fleet values.*/
-    /*ToDo: find all places in the code where type is used, add fleets there and then change back type to static*/
+    /*ToDo: find all places in the code where type is used, add fleet handling there and then change back type to const*/
 
     fl->fleet_type->construction->maxsize = ships_in_fleet;
     fl->fleet_type->construction->improvement = NULL; /* Otherwise it looks like the (fleet)ship is not finished*/
@@ -1930,6 +1937,12 @@ void init_fleet(ship *fl)
         fl->fleet_type->fishing = fishing;
         fl->flags |= SF_FISHING;
     }
+    if (nocoast)
+        fl->fleet_type->flags |= SFL_NOCOAST;
+    if (flying)
+        fl->fleet_type->flags |= SFL_FLY;
+    if (opensea)
+        fl->fleet_type->flags |= SFL_OPENSEA;
     fl->fleet_type->at_bonus = at_bonus;
     fl->fleet_type->df_bonus = df_bonus;
     fl->fleet_type->tac_bonus = tac_bonus;
@@ -2006,7 +2019,6 @@ sail(unit * u, order * ord, bool move_on_land, region_list ** routep)
     }
 
     if (sh->type == st_find("fleet")){
-        fleetdamage_to_ships(sh);
         init_fleet(sh);
     }
 
@@ -2042,7 +2054,7 @@ sail(unit * u, order * ord, bool move_on_land, region_list ** routep)
             break;
         }
 
-        if (!flying_ship(sh)) {
+        if (!flying_ship(sh) && !sh->fleet) {
             int stormchance = 0;
             int reason;
             if (storms_enabled) {
@@ -2094,13 +2106,12 @@ sail(unit * u, order * ord, bool move_on_land, region_list ** routep)
                                 break;
                             }
 
-                            if (sh->fleet) {
-                                fleetdamage_to_ships(sh);
+                            if (sh->type == st_find("fleet")){
+                                init_fleet(sh);
                                 if (sh->size <= 0) {
                                     /* fleet destroyed, end journey here */
                                     break;
                                 }
-
                             }
 
                             next_point = rnext;
@@ -2204,8 +2215,8 @@ sail(unit * u, order * ord, bool move_on_land, region_list ** routep)
         }
     }
 
-    if (sh->fleet) {
-        fleetdamage_to_ships(sh);
+    if (sh->type == st_find("fleet")){
+        init_fleet(sh);
         if (sh->size <= 0) {
             if (sh->region) {
                 ADDMSG(&f->msgs, msg_message("shipsink", "ship", sh));
@@ -2214,7 +2225,6 @@ sail(unit * u, order * ord, bool move_on_land, region_list ** routep)
             sh = NULL;
         }
     }
-
 
     if (sh->damage >= sh->size * DAMAGE_SCALE) {
         if (sh->region) {

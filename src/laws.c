@@ -1163,7 +1163,7 @@ void do_enter(struct region *r, bool is_final_attempt)
                 case P_FLEET:
                     if (u->ship && u->ship->no == id)
                         break;
-                    sh = findship(id);
+                    sh = findship (id);
                     if (sh != NULL && sh->fleet)
                         id = sh->fleet->no;
                     if (enter_ship(u, ord, id, is_final_attempt)) {
@@ -2734,23 +2734,32 @@ void sinkships(struct region * r)
 
     while (*shp) {
         ship *sh = *shp;
-
-        if (!sh->type->construction || sh->size >= sh->type->construction->maxsize) {
-            if (fval(r->terrain, SEA_REGION)) {
-                if (!enoughsailors(sh, crew_skill(sh))) {
-                    // ship is at sea, but not enough people to control it
-                    double dmg = config_get_flt("rules.ship.damage.nocrewocean", 0.3);
+        if (!sh->fleet)  // Damge is handeld by the fleet, so skip ships that are part of a fleet
+        {
+            if (sh->type == st_find("fleet")) {
+                init_fleet(sh);
+            }
+            if (!sh->type->construction || sh->size >= sh->type->construction->maxsize) {
+                if (fval(r->terrain, SEA_REGION)) {
+                    if (!enoughsailors(sh, crew_skill(sh))) {
+                        // ship is at sea, but not enough people to control it
+                        double dmg = config_get_flt("rules.ship.damage.nocrewocean", 0.3);
+                        damage_ship(sh, dmg);
+                    }
+                }
+                else if (!ship_owner(sh)) {
+                    // any ship lying around without an owner slowly rots
+                    double dmg = config_get_flt("rules.ship.damage.nocrew", 0.05);
                     damage_ship(sh, dmg);
                 }
             }
-            else if (!ship_owner(sh)) {
-                // any ship lying around without an owner slowly rots
-                double dmg = config_get_flt("rules.ship.damage.nocrew", 0.05);
-                damage_ship(sh, dmg);
+            if (sh->type != st_find("fleet") && sh->damage >= sh->size * DAMAGE_SCALE) {
+                remove_ship(shp, sh);
             }
-        }
-        if (sh->damage >= sh->size * DAMAGE_SCALE) {
-            remove_ship(shp, sh);
+            if (sh->type == st_find("fleet") && sh->damage > 0)
+            {
+                init_fleet(sh);    // removing of ships in a fleet or the whole fleet is handled here
+            }
         }
         if (*shp == sh)
             shp = &sh->next;

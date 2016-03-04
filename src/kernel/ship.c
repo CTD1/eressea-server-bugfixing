@@ -326,7 +326,6 @@ int shipspeed(ship * sh, const unit * u) /* CTD const (const ship * sh, const un
     assert(u == ship_owner(sh));
 
     if (sh->type == st_find("fleet")) {
-        fleetdamage_to_ships(sh);
         init_fleet(sh);
         k = sh->fleet_type->range; 
     }
@@ -400,7 +399,10 @@ const char *shipname(const ship * sh)
 int shipcapacity(const ship * sh)
 {
     int i = sh->type->cargo;
-
+    if (sh->type == st_find("fleet"))
+    {
+        i = sh->fleet_type->cargo;
+    }
     /* sonst ist construction:: size nicht ship_type::maxsize */
     assert(!sh->type->construction
         || sh->type->construction->improvement == NULL);
@@ -612,7 +614,7 @@ void fleet(region * r)
                                 }
                                 if (u->number <= fl->size) {
                                     ADDMSG(&u->faction->msgs, msg_feedback(u, ord,
-                                        "error_fleet_no_low", "value ship", u->ship->type->cptskill,
+                                        "error_fleet_no_low", "value ship", fl->size+1,
                                         u->ship));
                                     break;
                                 }

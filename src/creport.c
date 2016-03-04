@@ -665,8 +665,7 @@ const faction * f, const region * r)*/
         LOC(f->locale, sh->type->_name)));
     fprintf(F, "%d;Groesse\n", sh->size);
     if (sh->damage) {
-        int percent =
-            (sh->damage * 100 + DAMAGE_SCALE - 1) / (sh->size * DAMAGE_SCALE);
+        int percent = ship_damage_percent(sh);
         fprintf(F, "%d;Schaden\n", percent);
     }
     if (u) {
@@ -679,8 +678,8 @@ const faction * f, const region * r)*/
     if (u && (u->faction == f || omniscient(f))) {
         int n = 0, p = 0;
         if (sh->type == st_find("fleet")) {
-            fleetdamage_to_ships(sh);
-            init_fleet(sh);
+            assert(sh->damage == 0);  // All damage should be transfert to the ships in the fleet already
+            assert(sh->size > 0); // A fleet with size 0 should be deleted long time ago
         }
         int mweight = shipcapacity(sh);
         getshipweight(sh, &n, &p);

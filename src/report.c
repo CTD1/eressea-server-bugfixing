@@ -2491,8 +2491,8 @@ const char *charset)
             if (sh) {
                 assert(!sh->fleet);                   // Ships that are part of a fleet should never have a unit inside
                 if (sh->type == st_find("fleet")) {
-                    fleetdamage_to_ships(sh);
-                    init_fleet(sh);
+                    assert(sh->damage == 0);  // All damage should be transfert to the ships in the fleet already
+                    assert(sh->size > 0); // A fleet with size 0 should be deleted long time ago
                     nr_ship(out, sr, sh, f, u);
                     fl = r->ships;
                     while (fl) {
